@@ -1,0 +1,29 @@
+*{
+  padding: 0;
+  margin: 0;
+}
+html,body{
+  height: 100%;
+  overflow: hidden;
+}
+canvas {
+  display: block;
+}
+
+button {
+  position: absolute;
+}
+#draw {
+  left: 40px;
+}
+#reset {
+  left: 80px;
+}
+
+.views {
+  display: flex;
+}
+
+.views canvas {
+  outline: 1px solid #ff0000;
+}

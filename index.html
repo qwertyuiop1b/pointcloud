@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vite + TS</title>
+</head>
+
+<body>
+  <button id="lock">锁定</button>
+  <button id="draw">绘制</button>
+  <button id="reset">重置</button>
+  <canvas id="main-scene"></canvas>
+  <div class="views">
+    <canvas id="front-scene"></canvas>
+    <canvas id="top-scene"></canvas>
+    <canvas id="side-scene"></canvas>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+
+</html>
