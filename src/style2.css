@@ -19,19 +19,3 @@ button {
 #reset {
   left: 80px;
 }
-
-.views {
-  position: relative;
-  display: flex;
-}
-
-.views canvas {
-  display: block;
-  outline: 1px solid #ff0000;
-}
-
-
-.canvas-container {
-  position: absolute !important;
-  left: 0;
-}

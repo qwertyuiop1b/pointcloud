@@ -2,6 +2,8 @@ import "./style.css";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { PCDLoader } from "three/examples/jsm/loaders/PCDLoader";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls"
+
 
 
 type CanvasElementWithRenderer = HTMLCanvasElement & {
@@ -14,7 +16,7 @@ const DEFAULT_SCALE_X = 1 / 3;
 const DEFAULT_SCALE_Y = 0.3;
 
 
-let controls: null | OrbitControls = null;
+
 let mainCamera: null | THREE.PerspectiveCamera = null;
 let multpileViewZoom = 50;
 let winHeight = window.innerHeight;
@@ -28,6 +30,7 @@ let activeBox: THREE.Mesh | null = null
 
 
 const raycaster = new THREE.Raycaster()
+
 
 
 function createRenderer(cvs: CanvasElementWithRenderer) {
@@ -74,6 +77,7 @@ function updateCvsList(cvsList: Array<CanvasElementWithRenderer>) {
   });
 }
 
+const viewContainer = document.querySelector(".views") as HTMLDivElement;
 
 const mainCanvas = document.querySelector(
   "#main-scene"
@@ -169,11 +173,15 @@ const allCameras: Array<{
 const scene = new THREE.Scene();
 
 const helper = new THREE.AxesHelper(10);
+helper.layers.disable(0)
+helper.layers.set(1)
+helper.layers.enable(1)
+
 scene.add(helper);
 
 addPointsToScene(scene);
 
-allCameras.forEach((cameraItem) => {
+allCameras.forEach((cameraItem, idx) => {
   const { eye, up, fov, canvas } = cameraItem;
   if (cameraItem.type === "perspectiveCamera") {
     const camera = new THREE.PerspectiveCamera(
@@ -184,6 +192,8 @@ allCameras.forEach((cameraItem) => {
     );
     camera.position.fromArray(eye);
     camera.up.fromArray(up);
+    camera.layers.enable(1)
+    
     scene.add(camera);
     cameraItem.camera = camera;
     mainCamera = camera;
@@ -204,14 +214,17 @@ allCameras.forEach((cameraItem) => {
     camera.up.fromArray(up);
     camera.updateProjectionMatrix();
     scene.add(camera);
+
     cameraItem.camera = camera;
     cameraItem.canvas.camera = camera;
   }
 });
 
 
+
+
 // add controls
-controls = new OrbitControls(mainCamera!, mainCanvas);
+const controls = new OrbitControls(mainCanvas.camera!, mainCanvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.25;
 controls.listenToKeyEvents(window); // optional
@@ -224,6 +237,16 @@ controls.keys = {
 controls.keyPanSpeed = 30.0;
 
 
+const transformControls = new TransformControls(mainCamera!, mainCanvas)
+transformControls.addEventListener( 'dragging-changed', function ( event ) {
+  console.log("dragging-changed", event)
+  controls.enabled = ! event.value;
+});
+transformControls.setSize(0.7)
+scene.add(transformControls)
+
+
+
 const boxGeometry = new THREE.BoxGeometry(1, 3, 1);
 const boxEdgeGeometry = new THREE.EdgesGeometry(boxGeometry);
 const boxMaterial = new THREE.MeshBasicMaterial({
@@ -233,9 +256,10 @@ const boxMaterial = new THREE.MeshBasicMaterial({
 });
 
 
+
 function render() {
   controls?.update();
-  raycaster.setFromCamera(mouse, mainCamera!)
+  // raycaster.setFromCamera(mouse, mainCamera!)
   allCameras.forEach((camera) => {
     if (camera.type === "orthographicCamera") {
       camera.updateCamera(camera.camera, activeBoxPosition);
@@ -269,6 +293,7 @@ btnDraw.addEventListener("click", () => {
   const mainCanvasMouseMove = () => {
     box.position.set(pos.x, pos.y, pos.z);
     activeBoxPosition.set(pos.x, pos.y, pos.z);
+    
   };
 
   mainCanvas.addEventListener("mousemove", mainCanvasMouseMove);
@@ -276,6 +301,8 @@ btnDraw.addEventListener("click", () => {
   mainCanvas.addEventListener("contextmenu", (evt) => {
     evt.preventDefault();
     mainCanvas.removeEventListener("mousemove", mainCanvasMouseMove);
+    transformControls.attach(box)
+
     allDrawBoxs.push(box)
 
   });
@@ -321,7 +348,7 @@ mainCanvas.addEventListener("click", () => {
 
 })
 
-const viewContainer = document.querySelector(".views") as HTMLDivElement;
+
 viewContainer.addEventListener("wheel", (evt: WheelEvent) => {
   evt.preventDefault();
   if (evt.deltaY > 0) {
@@ -329,6 +356,29 @@ viewContainer.addEventListener("wheel", (evt: WheelEvent) => {
   } else {
     multpileViewZoom -= 1;
   }
+  
 });
 
 render();
+
+
+window.addEventListener("keydown", (evt: KeyboardEvent) => {
+  console.log(evt.key)
+  switch (evt.key) {
+    case "s":
+      transformControls.setMode("scale")
+      break
+    case "t":
+      transformControls.setMode("translate")
+      break
+    case "r":
+      transformControls.setMode("rotate")
+      break
+    case "Escape":
+      transformControls.reset()
+      break
+    
+  }
+})
+
+
