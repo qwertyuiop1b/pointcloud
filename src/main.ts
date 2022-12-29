@@ -19,10 +19,14 @@ const DEFAULT_SCALE_Y = 0.3;
 
 let mainCamera: null | THREE.PerspectiveCamera = null;
 let multpileViewZoom = 50;
+let activeBoxPoints = null
 let winHeight = window.innerHeight;
 let winWidth = window.innerWidth;
 const mouse = new THREE.Vector2();
+const frontMouse = new THREE.Vector2()
 const activeBoxPosition = new THREE.Vector3();
+
+const allPointBoxs: Array<THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>> = []
 
 
 const allDrawBoxs: Array<THREE.Mesh> = []
@@ -30,7 +34,16 @@ let activeBox: THREE.Mesh | null = null
 
 
 const raycaster = new THREE.Raycaster()
+const frontRaycaster = new THREE.Raycaster()
+frontRaycaster.layers.set(1)
 
+
+function createPointBox() {
+  const geometry = new THREE.SphereGeometry(0.1, 0.1, 16)
+  const material = new THREE.MeshBasicMaterial({color: 0x00ff00})
+  const sphere = new THREE.Mesh(geometry, material)
+  return sphere
+}
 
 
 function createRenderer(cvs: CanvasElementWithRenderer) {
@@ -45,13 +58,12 @@ function createRenderer(cvs: CanvasElementWithRenderer) {
   return renderer;
 }
 
-function addPointsToScene(scene: THREE.Scene): Promise<THREE.Points> {
+function loadPoints(): Promise<THREE.Points> {
   return new Promise((resolve, reject) => {
     const loader = new PCDLoader();
     loader.load(
       "/000053.pcd",
       (points) => {
-        scene.add(points);
         resolve(points);
       },
       () => {},
@@ -70,8 +82,8 @@ function updateCvsList(cvsList: Array<CanvasElementWithRenderer>) {
       scaleX = 1;
       scaleY = 0.7;
     }
-    c.width = Math.floor(scaleX * winWidth);
-    c.height = Math.floor(scaleY * winHeight);
+    c.width = scaleX * winWidth;
+    c.height = scaleY * winHeight;
     c.renderer.setSize(c.width / window.devicePixelRatio, c.height / window.devicePixelRatio, false);
     c.renderer.setPixelRatio(window.devicePixelRatio)
   });
@@ -102,8 +114,8 @@ allCanvas.forEach((cvs, idx) => {
     scaleX = 1;
     scaleY = 0.7;
   }
-  cvs.width = Math.floor(scaleX * winWidth);
-  cvs.height = Math.floor(scaleY * winHeight);
+  cvs.width = scaleX * winWidth;
+  cvs.height = scaleY * winHeight;
   createRenderer(cvs);
 });
 
@@ -157,7 +169,7 @@ const allCameras: Array<{
   {
     type: "orthographicCamera",
     eye: [10, 0, 0],
-    up: [0, 1, 0],
+    up: [0, 0, 1],
     updateCamera(camera: THREE.OrthographicCamera, target: THREE.Vector3) {
       camera.zoom = multpileViewZoom;
       camera.position.set(target.x + 10, target.y, target.z)
@@ -173,13 +185,15 @@ const allCameras: Array<{
 const scene = new THREE.Scene();
 
 const helper = new THREE.AxesHelper(10);
-helper.layers.disable(0)
-helper.layers.set(1)
-helper.layers.enable(1)
-
 scene.add(helper);
 
-addPointsToScene(scene);
+loadPoints().then(points => {
+  points.layers.enable(0)
+  points.layers.enable(1)
+  points.layers.enable(2)
+  points.layers.enable(3)
+  scene.add(points)
+});
 
 allCameras.forEach((cameraItem, idx) => {
   const { eye, up, fov, canvas } = cameraItem;
@@ -192,13 +206,10 @@ allCameras.forEach((cameraItem, idx) => {
     );
     camera.position.fromArray(eye);
     camera.up.fromArray(up);
-    camera.layers.enable(1)
-    
     scene.add(camera);
     cameraItem.camera = camera;
     mainCamera = camera;
     cameraItem.canvas.camera = camera;
-
 
   } else if (cameraItem.type === "orthographicCamera") {
     const camera = new THREE.OrthographicCamera(
@@ -213,14 +224,12 @@ allCameras.forEach((cameraItem, idx) => {
     camera.position.fromArray(eye);
     camera.up.fromArray(up);
     camera.updateProjectionMatrix();
+    camera.layers.set(idx)
     scene.add(camera);
-
     cameraItem.camera = camera;
     cameraItem.canvas.camera = camera;
   }
 });
-
-
 
 
 // add controls
@@ -247,7 +256,7 @@ scene.add(transformControls)
 
 
 
-const boxGeometry = new THREE.BoxGeometry(1, 3, 1);
+const boxGeometry = new THREE.BoxGeometry(2, 2, 2);
 const boxEdgeGeometry = new THREE.EdgesGeometry(boxGeometry);
 const boxMaterial = new THREE.MeshBasicMaterial({
   color: 0xff0000,
@@ -259,7 +268,10 @@ const boxMaterial = new THREE.MeshBasicMaterial({
 
 function render() {
   controls?.update();
-  // raycaster.setFromCamera(mouse, mainCamera!)
+  raycaster.setFromCamera(mouse, mainCamera!)
+
+  
+
   allCameras.forEach((camera) => {
     if (camera.type === "orthographicCamera") {
       camera.updateCamera(camera.camera, activeBoxPosition);
@@ -272,7 +284,7 @@ function render() {
 
 window.addEventListener("resize", () => {
   winHeight = window.innerHeight;
-  winWidth - window.innerWidth;
+  winWidth = window.innerWidth;
   updateCvsList(allCanvas)
 });
 
@@ -285,8 +297,14 @@ btnDraw.addEventListener("click", () => {
   const box = new THREE.Mesh(boxGeometry, boxMaterial);
   const boxLineMaterial = new THREE.LineBasicMaterial({color: 0xff0000})
   const line = new THREE.LineSegments(boxEdgeGeometry, boxLineMaterial)
+  line.layers.enable(1)
+  line.layers.enable(2)
+  line.layers.enable(3)
   box.add(line)
   box.position.set(pos.x, pos.y, pos.z);
+  box.layers.enable(1)
+  box.layers.enable(2)
+  box.layers.enable(3)
   scene.add(box);
 
 
@@ -301,10 +319,65 @@ btnDraw.addEventListener("click", () => {
   mainCanvas.addEventListener("contextmenu", (evt) => {
     evt.preventDefault();
     mainCanvas.removeEventListener("mousemove", mainCanvasMouseMove);
+
+    console.log("boxGeometry", boxGeometry)
+
+
+
+
+    const pointBox = createPointBox()
+    pointBox.layers.disable(0)
+    pointBox.layers.enable(1)
+    pointBox.layers.enable(2)
+    pointBox.layers.enable(3)
+
+    const allVectors: Array<THREE.Vector3> = []
+
+    const position = box.geometry.attributes.position
+    
+    for (let i = 0, l = position.count; i < l; i++) {
+      const vector = new THREE.Vector3()
+      vector.fromBufferAttribute( position, i );
+      vector.applyMatrix4( box.matrixWorld );
+      const result = allVectors.find(v => {
+        return v.x === vector.x && v.y === vector.y && v.z === vector.z
+      })
+      if (!result) {
+        const temp = pointBox.clone()
+        temp.position.fromArray(vector.toArray())
+        // @ts-ignore
+        temp.data = {index: i}
+        scene.add(temp)
+        
+        allPointBoxs.push(temp)
+        allVectors.push(vector)
+      }
+    }
+    console.log(allVectors.length)
+
+
+    // pointBox.position.set(activeBoxPosition.x + 1, activeBoxPosition.y + 1, activeBoxPosition.z + 1);
+    // scene.add(pointBox)
+
+    // console.log(box)
+
+
+    // 创建顶点
+    // const boxPoints = new THREE.Points(boxGeometry, new THREE.PointsMaterial({
+    //   color: 0x0000ff,
+    //   size: 8,
+    // }))
+    // boxPoints.layers.disable(0)
+    // boxPoints.layers.enable(1)
+    // boxPoints.layers.enable(2)
+    // boxPoints.layers.enable(3)
+    // activeBoxPoints = boxPoints
+    // box.add(boxPoints)
+    
+
     transformControls.attach(box)
-
     allDrawBoxs.push(box)
-
+    
   });
 });
 
@@ -326,15 +399,71 @@ mainCanvas.addEventListener("mousemove", (evt: MouseEvent) => {
 });
 
 
+let mouseDown = false
+frontCanvas.addEventListener("mousemove", (evt: MouseEvent) => {
+  const { left, top } = frontCanvas.getBoundingClientRect()
+  frontMouse.x = ((evt.clientX - left) / frontCanvas.width) * 2 - 1;
+  frontMouse.y = -((evt.clientY - top) / frontCanvas.height) * 2 + 1;
+
+  frontRaycaster.setFromCamera(frontMouse, frontCanvas.camera!)
+
+  const pss = frontRaycaster.intersectObjects(allPointBoxs)
+  if (pss.length) {
+    console.log("pss", pss)
+    frontCanvas.style.cursor = "move"
+  } else {
+    frontCanvas.style.cursor = "auto"
+  }
+
+})
+
+
+const handleMouseDown = evt => {
+  mouseDown = true
+  console.log(mouseDown)
+
+  const handleMove = () => {
+    console.log("move....")
+  }
+
+  const handleUp = () => {
+    frontCanvas.removeEventListener("mousemove", handleMove)
+    frontCanvas.removeEventListener("mouseup", handleUp)
+  }
+
+  frontCanvas.addEventListener("mousemove",handleMove)
+
+  frontCanvas.addEventListener("mouseup", handleUp)
+}
+
+frontCanvas.addEventListener("mousedown", handleMouseDown)
+
+
+
+
+
+
+
+topCanvas.addEventListener("mousemove", (evt: MouseEvent) => {
+
+})
+
+
+sideCanvas.addEventListener("mousemove", (evt: MouseEvent) => {
+
+})
+
+
 mainCanvas.addEventListener("click", () => {
   const intersects = raycaster.intersectObjects(allDrawBoxs, false);
-
 
   if (activeBox) {
     // @ts-ignore
     activeBox.children[0]!.material.color = new THREE.Color(0xff0000)
     // @ts-ignore
     activeBox.children[0]!.material.needsUpdate = true
+
+    transformControls.detach()
   }
 
 
@@ -344,7 +473,13 @@ mainCanvas.addEventListener("click", () => {
     material.color = new THREE.Color(0x00ff00)
     material.needsUpdate = true
     activeBoxPosition.set(activeBox.position.x, activeBox.position.y, activeBox.position.z)
+    transformControls.attach(activeBox)
   }
+
+})
+
+mainCanvas.addEventListener("contextmenu", (evt) => {
+  evt.preventDefault()
 
 })
 
